@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8 -*-
 
-import socket
+import socket, sys
 from urlparse import urlparse
 from hexdump import hexdump
 
@@ -115,12 +115,12 @@ def request(method, url, headers={}, ret_limit=0):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except socket.error, msg:
             sys.stderr.write("[ERROR] %s\n" % msg[1])
-            return None
+            return 'Error'
         try:
             sock.connect((host, port))
         except socket.error, msg:
             sys.stderr.write("[ERROR] %s\n" % msg[1])
-            return None
+            return 'Error'
 
         if u.query:
             fullpath = u.path + '?' + u.query

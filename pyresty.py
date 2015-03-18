@@ -25,16 +25,18 @@ def center(win):
     geom = (win_width, win_height, x, y) # see note
     win.geometry('{0}x{1}+{2}+{3}'.format(*geom))
 
-CURRENT_CONFIG_VERSION = 0
-
+CURRENT_CONFIG_VERSION = 1
+OPTION_COUNT = 5
 
 class Config(object):
     def __init__(self):
         super(Config, self).__init__()
-        global CURRENT_CONFIG_VERSION
+        global CURRENT_CONFIG_VERSION, OPTION_COUNT
         self.config_version = CURRENT_CONFIG_VERSION
         self.url = 'http://'
-        self.headers = {}
+        self.headers = {}  # {idx: [k,v]}
+        for i in range(OPTION_COUNT):
+            self.headers[i] = ['','']
         self.max_recv = 1024 * 10
     def getConfigVersion(self):
         return self.config_version
@@ -42,8 +44,6 @@ class Config(object):
         self.url = url
     def getUrl(self):
         return self.url
-    def getHeaders(self):
-        return self.headers
     def setMaxRecv(self, max_recv):
         self.max_recv = max_recv
     def getMaxRecv(self):
@@ -86,6 +86,7 @@ class PyRESTyApp(tk.Tk):
             return False
 
     def initialize(self):
+        global OPTION_COUNT
         self.loadConfig()
 
         center(self)
@@ -126,7 +127,6 @@ class PyRESTyApp(tk.Tk):
         self.header_key_list = []
         self.header_value_list = []
         ROW_BEFORE_OPTIONS = 3
-        OPTION_COUNT = 5
         for i in range(OPTION_COUNT):
             OPTIONS = [
                 "",
@@ -140,20 +140,37 @@ class PyRESTyApp(tk.Tk):
                 'Accept-Language'
             ]
 
-            def key_change(*args):
-                print 'change for key#%d args %s' % (i, str(args))
+            def make_key_change_func(idx):
+                def key_change(*args):
+                    newval = self.header_key_list[idx].get()
+                    print 'change for key#%d args %s, new val %s' % (idx, str(args), newval)
+                    self.config.headers[idx] = [newval, self.config.headers[idx][1]]
+                return key_change
+
             key_variable = tk.StringVar(self)
-            key_variable.set(OPTIONS[0]) # default value
-            key_variable.trace('w', key_change)
+            if self.config.headers[i][0] not in OPTIONS:
+                key_variable.set(OPTIONS[0]) # default value
+            else:
+                key_variable.set(self.config.headers[i][0])
+            key_variable.trace('w', make_key_change_func(i))
 
             w = apply(tk.OptionMenu, (self, key_variable) + tuple(OPTIONS))
             w.grid(column=0, row=ROW_BEFORE_OPTIONS+i, columnspan=1, sticky='W')
             self.header_key_list.append(key_variable)
             
+            def make_value_change_func(idx):
+                def value_change(*args):
+                    newval = self.header_value_list[idx].get()
+                    #print 'change for value#%d args %s, new val %s' % (idx, str(args), newval)
+                    self.config.headers[idx] = [self.config.headers[idx][0], newval]
+                return value_change
+
             value_variable = tk.StringVar()
+            value_variable.set(self.config.headers[i][1])
             value_entry = tk.Entry(self,textvariable=value_variable)
             value_entry.grid(column=1, row=ROW_BEFORE_OPTIONS+i, columnspan=3, sticky='W')
             self.header_value_list.append(value_variable)
+            value_variable.trace('w', make_value_change_func(i))
 
         self.msg = tk.Text(self, height=15, width=700)
         self.msg.grid(row=ROW_BEFORE_OPTIONS+OPTION_COUNT, columnspan=4)
