@@ -18,7 +18,7 @@ def center(win):
     frm_width = win.winfo_rootx() - win.winfo_x()
     win_width = 768#win.winfo_width() + (frm_width*2)
     titlebar_height = win.winfo_rooty() - win.winfo_y()
-    win_height = 500#win.winfo_height() + (titlebar_height + frm_width)
+    win_height = 700#win.winfo_height() + (titlebar_height + frm_width)
     x = (win.winfo_screenwidth() / 2) - (win_width / 2)
     y = win.winfo_rooty() #(win.winfo_screenheight() / 2) - (win_height / 2)
     # geom = (win.winfo_width(), win.winfo_height(), x, y) # see note
@@ -26,7 +26,7 @@ def center(win):
     win.geometry('{0}x{1}+{2}+{3}'.format(*geom))
 
 CURRENT_CONFIG_VERSION = 1
-OPTION_COUNT = 5
+OPTION_COUNT = 8
 
 class Config(object):
     def __init__(self):
@@ -105,7 +105,7 @@ class PyRESTyApp(tk.Tk):
         label = tk.Label(self,textvariable=self.labelVariable,
                               anchor="w",fg="white",bg="blue")
         label.grid(column=0,row=1,columnspan=4,sticky='EW')
-        self.labelVariable.set(u"Hello !")
+        self.labelVariable.set(u"I suggest using Connection:close to avoid recv hanging on more data.")
 
         save_button = tk.Button(self,text=u"保存配置", command=self.OnSaveConfigClicked)
         save_button.grid(column=0,row=2)

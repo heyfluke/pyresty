@@ -158,8 +158,8 @@ def request(method, url, headers={}, ret_limit=0):
                 fb.write(data)
                 print '>>> body:'
                 hexdump(data)
-                read_body_len += len(body)
-                ret_content += '\nBody:\n' + hexdump(body, result='return')
+                read_body_len += len(data)
+                ret_content += '\nBody:\n' + hexdump(data, result='return')
                 if headers.has_key('Content-Length') and read_body_len >= int(headers['Content-Length']):
                     break
             else:
