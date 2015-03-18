@@ -89,13 +89,15 @@ class HttpParser(object):
 def request(method, url, headers={}, ret_limit=0):
     MAX_RECV_LENGTH = 1024*1024*1024
 
+    ret_content = ''
+
     if method not in ('GET', 'POST'):
-        return None
+        return 'Method not supported'
 
     u = urlparse(url)
 
     if u.scheme != 'http':
-        return None
+        return 'scheme not supported'
 
     host = u.netloc
     port = 80
@@ -113,17 +115,19 @@ def request(method, url, headers={}, ret_limit=0):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except socket.error, msg:
             sys.stderr.write("[ERROR] %s\n" % msg[1])
-            sys.exit(1)
+            return None
         try:
             sock.connect((host, port))
         except socket.error, msg:
             sys.stderr.write("[ERROR] %s\n" % msg[1])
-            sys.exit(2)
+            return None
 
         if u.query:
             fullpath = u.path + '?' + u.query
         else:
             fullpath = u.path
+
+        ret_content += '\nRequest Headers:\n' + str(headers)
         
         request_content = ''
         request_content += "GET %s HTTP/1.1\r\nHost: %s\r\n" % (fullpath, host)
@@ -142,7 +146,9 @@ def request(method, url, headers={}, ret_limit=0):
 
         fb = open('data.bin', 'wb')
         
+        read_body_len = 0
         body_pos = 0
+        headers = {}
         while True:
             data = sock.recv(bytes_remaining)
             # print 'recved data:'
@@ -152,16 +158,26 @@ def request(method, url, headers={}, ret_limit=0):
                 fb.write(data)
                 print '>>> body:'
                 hexdump(data)
+                read_body_len += len(body)
+                ret_content += '\nBody:\n' + hexdump(body, result='return')
+                if headers.has_key('Content-Length') and read_body_len >= int(headers['Content-Length']):
+                    break
             else:
                 ret = parser.appendData(data)
                 if ret and parser.isValidHTTP():
                     body_pos = parser.getBodyPos()
                     print 'headers:'
-                    print parser.getHeaders()
+                    headers = parser.getHeaders()
+                    print headers
+                    ret_content += '\nHeaders:\n' + str(headers)
                     body = parser.getBodyContent()
+                    read_body_len += len(body)
                     print '>>> first part of body(body_pos=%d):' % (body_pos)
                     hexdump(body)
                     fb.write(body)
+                    ret_content += '\nBody:\n' + hexdump(body, result='return')
+                    if headers.has_key('Content-Length') and read_body_len >= int(headers['Content-Length']):
+                        break
 
             length = len(data)
 
@@ -173,7 +189,7 @@ def request(method, url, headers={}, ret_limit=0):
         sock.close()
         fb.close()
 
-    return u
+    return ret_content
 
 
 def main():
