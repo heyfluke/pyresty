@@ -3,6 +3,7 @@
 
 import tkMessageBox
 import restclient
+import cPickle as pickle
 
 try:
     # Python2
@@ -10,6 +11,7 @@ try:
 except ImportError:
     # Python3
     import tkinter as tk
+
 
 def center(win):
     win.update_idletasks()
@@ -23,16 +25,69 @@ def center(win):
     geom = (win_width, win_height, x, y) # see note
     win.geometry('{0}x{1}+{2}+{3}'.format(*geom))
 
+CURRENT_CONFIG_VERSION = 0
 
 
+class Config(object):
+    def __init__(self):
+        super(Config, self).__init__()
+        global CURRENT_CONFIG_VERSION
+        self.config_version = CURRENT_CONFIG_VERSION
+        self.url = 'http://'
+        self.headers = {}
+        self.max_recv = 1024 * 10
+    def getConfigVersion(self):
+        return self.config_version
+    def setUrl(self, url):
+        self.url = url
+    def getUrl(self):
+        return self.url
+    def getHeaders(self):
+        return self.headers
+    def setMaxRecv(self, max_recv):
+        self.max_recv = max_recv
+    def getMaxRecv(self):
+        return self.max_recv
 
-class simpleapp_tk(tk.Tk):
+
+class PyRESTyApp(tk.Tk):
     def __init__(self,parent):
         tk.Tk.__init__(self,parent)
         self.parent = parent
+        self.CONFIG_FILE = 'config.conf'
         self.initialize()
 
+    def loadConfig(self):
+        global CURRENT_CONFIG_VERSION
+        # FIXME: relative path
+        try:
+            f = open(self.CONFIG_FILE, 'rb')
+            self.config = pickle.load(f)
+            f.close()
+            try:
+                if self.config.getConfigVersion() != CURRENT_CONFIG_VERSION:
+                    print 'config version not match'
+                    self.config = Config()
+            except AttributeError:
+                print 'AttributeError'
+                self.config = Config()
+        except IOError:
+            print 'no config.conf found'
+            self.config = Config()
+
+    def saveConfig(self):
+        try:
+            f = open(self.CONFIG_FILE, 'wb')
+            pickle.dump(self.config, f)
+            f.close()
+            return True
+        except IOError:
+            print 'dump config.conf failed'
+            return False
+
     def initialize(self):
+        self.loadConfig()
+
         center(self)
         self.grid()
 
@@ -40,7 +95,7 @@ class simpleapp_tk(tk.Tk):
         self.entry = tk.Entry(self,textvariable=self.entryVariable)
         self.entry.grid(column=0,row=0,columnspan=3,sticky='EW')
         self.entry.bind("<Return>", self.OnPressEnter)
-        self.entryVariable.set(u"http://")
+        self.entryVariable.set(self.config.getUrl())
 
         get_button = tk.Button(self,text=u"GET", command=self.OnGETClicked)
         get_button.grid(column=3,row=0)
@@ -55,7 +110,18 @@ class simpleapp_tk(tk.Tk):
         save_button.grid(column=0,row=2)
 
         clear_button = tk.Button(self,text=u"恢复默认", command=self.OnClearConfigClicked)
-        clear_button.grid(column=2,row=2)
+        clear_button.grid(column=1,row=2)
+
+        max_recv_label_variable = tk.StringVar()
+        max_recv_label = tk.Label(self,textvariable=max_recv_label_variable,
+                              anchor="w")
+        max_recv_label.grid(column=2,row=2,sticky='EW')
+        max_recv_label_variable.set(u'最大TCP接收量:')
+
+        self.max_recv_entry_variable = tk.StringVar()
+        self.max_recv_entry = tk.Entry(self,textvariable=self.max_recv_entry_variable)
+        self.max_recv_entry.grid(column=3,row=2,columnspan=3,sticky='EW')
+        self.max_recv_entry_variable.set(self.config.getMaxRecv())
 
         self.header_key_list = []
         self.header_value_list = []
@@ -74,12 +140,15 @@ class simpleapp_tk(tk.Tk):
                 'Accept-Language'
             ]
 
-            variable = tk.StringVar(self)
-            variable.set(OPTIONS[0]) # default value
+            def key_change(*args):
+                print 'change for key#%d args %s' % (i, str(args))
+            key_variable = tk.StringVar(self)
+            key_variable.set(OPTIONS[0]) # default value
+            key_variable.trace('w', key_change)
 
-            w = apply(tk.OptionMenu, (self, variable) + tuple(OPTIONS))
+            w = apply(tk.OptionMenu, (self, key_variable) + tuple(OPTIONS))
             w.grid(column=0, row=ROW_BEFORE_OPTIONS+i, columnspan=1, sticky='W')
-            self.header_key_list.append(variable)
+            self.header_key_list.append(key_variable)
             
             value_variable = tk.StringVar()
             value_entry = tk.Entry(self,textvariable=value_variable)
@@ -116,14 +185,20 @@ class simpleapp_tk(tk.Tk):
                 print 'header #%d: %s=%s' % (i, key.get(), value.get())
                 if len(key.get()):
                     headers[key.get()] = value.get()
-            ret = restclient.request('GET', url, headers=headers, ret_limit=40000)
+            ret = restclient.request('GET', url, headers=headers, ret_limit=self.config.getMaxRecv())
             self.msg.insert(tk.END, ret)
 
     def OnSaveConfigClicked(self):
-        pass
+        url = self.entryVariable.get()
+        self.config.setUrl(url)
+        if not self.saveConfig():
+            tkMessageBox.showinfo("出错", "保存错误")
 
     def OnClearConfigClicked(self):
-        pass
+        url = self.entryVariable.get()
+        self.config = Config()
+        if not self.saveConfig():
+            tkMessageBox.showinfo("出错", "清除错误")
 
     def OnPressEnter(self,event):
         self.labelVariable.set( self.entryVariable.get()+" (You pressed ENTER)" )
@@ -134,5 +209,5 @@ class simpleapp_tk(tk.Tk):
         self.destroy()
 
 if __name__ == "__main__":
-    app = simpleapp_tk(None)
+    app = PyRESTyApp(None)
     app.Main()
